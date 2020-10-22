@@ -1,7 +1,6 @@
 import os
 from fnmatch import fnmatch
 import zipfile
-import pandas as pd
 from io import BytesIO
 
 
@@ -14,31 +13,57 @@ def find_all_zips(root, pattern):
     return zips
 
 
+def save_logistics_line(file_str):
+    lines = file_str.split('\n')
+    to_save = []
+    for line in lines:
+        if line.startswith('LOGISTICS_1'):
+            # save everything but LOGISTICS_1\t
+            to_save.append(line[12:])
+    return to_save
+
+
+def add_time(filename, line):
+    if line:
+        return line[:-1] + filename + ';'
+    else:
+        return ''
+
+
+def add_time_path(filename, zip_path, line):
+    line = add_time(filename, line)
+    if line:
+        return line[:-1] + zip_path + '\n'
+    else:
+        return ''
+
+
 def get_zip_values(zip_file_path):
-    out_df = pd.DataFrame(columns=['LOGISTICS_1', 'START_TIME'])
     with zipfile.ZipFile(zip_file_path, 'r') as archive:
         for file in archive.filelist:
-            new_df = pd.DataFrame(columns=['LOGISTICS_1', 'START_TIME'])
-            df = pd.read_csv(BytesIO(archive.read(file)),
-                             encoding='utf-8',
-                             sep='\t')
-            new_df['LOGISTICS_1'] = df['Column2'][df['Column1'] ==
-                                                  'LOGISTICS_1'].values
-            new_df['START_TIME'] = df['Column2'][df['Column1'] ==
-                                                 'START_TIME'].iat[0]
-        out_df = out_df.append(new_df, ignore_index=True)
-        return out_df
+            file_str = archive.read(file).decode("utf-8")
+            logistics_lines = save_logistics_line(file_str)
+            for i, line in enumerate(logistics_lines):
+                logistics_lines[i] = add_time_path(file.filename,
+                                                   zip_file_path, line)
+        return logistics_lines
 
 
 def get_all_values_from_zips(root, pattern):
     zips = find_all_zips(root, pattern)
-    df = get_zip_values(zips[0])
-    for zip_file in zips[1:]:
-        df = df.append(get_zip_values(zip_file), ignore_index=True)
-    return df
+    lines = []
+    for zip_file in zips:
+        lines.extend(get_zip_values(zip_file))
+    return lines
+
+
+def lines_to_csv(lines):
+    to_csv = ''.join(lines)
+    with open('logistics_1.csv', 'w') as file:
+        file.write(to_csv)
 
 
 if __name__ == "__main__":
     root = './all_the_zips'
     pattern = "*.zip"
-    df = get_all_values_from_zips(root, pattern)
+    lines = get_all_values_from_zips(root, pattern)
