@@ -73,7 +73,6 @@ def get_zip_values(zip_path):
             logistics_lines = (get_logistics_line(file_str))
             for i, line in enumerate(logistics_lines):
                 line = get_values(line)
-                print(file.filename, line)
                 logistics_lines[i] = add_time_path(file.filename, zip_path,
                                                    line)
             all_lines.extend(logistics_lines)
